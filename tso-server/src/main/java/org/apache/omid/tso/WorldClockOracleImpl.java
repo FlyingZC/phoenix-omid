@@ -45,7 +45,7 @@ public class WorldClockOracleImpl implements TimestampOracle {
 
     private static final Logger LOG = LoggerFactory.getLogger(WorldClockOracleImpl.class);
 
-    static final long MAX_TX_PER_MS = 1_000_000; // 1 million
+    static final long MAX_TX_PER_MS = 1_000_000; // 1 million 每毫秒可容纳的最大事务数
     static final long TIMESTAMP_INTERVAL_MS = 10_000; // 10 seconds interval
     private static final long TIMESTAMP_ALLOCATION_INTERVAL_MS = 7_000; // 7 seconds
 
@@ -55,7 +55,7 @@ public class WorldClockOracleImpl implements TimestampOracle {
     private TimestampStorage storage;
     private Panicker panicker;
 
-    private volatile long maxAllocatedTime;
+    private volatile long maxAllocatedTime; // 已经分配的最大时间戳
 
     private final ScheduledExecutorService scheduler =
             Executors.newScheduledThreadPool(1, new ThreadFactoryBuilder().setNameFormat("ts-persist-%d").build());
@@ -63,7 +63,7 @@ public class WorldClockOracleImpl implements TimestampOracle {
     private Runnable allocateTimestampsBatchTask;
 
     private class AllocateTimestampBatchTask implements Runnable {
-        long previousMaxTime;
+        long previousMaxTime; // 最大时间戳
 
         AllocateTimestampBatchTask(long previousMaxTime) {
             this.previousMaxTime = previousMaxTime;
@@ -71,9 +71,9 @@ public class WorldClockOracleImpl implements TimestampOracle {
 
         @Override
         public void run() {
-            long newMaxTime = (System.currentTimeMillis() + TIMESTAMP_INTERVAL_MS) * MAX_TX_PER_MS;
+            long newMaxTime = (System.currentTimeMillis() + TIMESTAMP_INTERVAL_MS) * MAX_TX_PER_MS; // 预测一个未来的时间窗口内允许的最大事务时间戳.当前时间（System.currentTimeMillis()）加上一个预设的时间间隔TIMESTAMP_INTERVAL_MS，然后乘以每毫秒允许的最大事务数MAX_TX_PER_MS
             try {
-                storage.updateMaxTimestamp(previousMaxTime, newMaxTime);
+                storage.updateMaxTimestamp(previousMaxTime, newMaxTime); // 更新存储的最大时间戳
                 maxAllocatedTime = newMaxTime;
                 previousMaxTime = newMaxTime;
             } catch (Throwable e) {
@@ -102,7 +102,7 @@ public class WorldClockOracleImpl implements TimestampOracle {
     @Override
     public void initialize() throws IOException {
 
-        this.lastTimestamp = this.maxTimestamp = storage.getMaxTimestamp();
+        this.lastTimestamp = this.maxTimestamp = storage.getMaxTimestamp(); // 从存储中获取最大时间戳
 
         this.allocateTimestampsBatchTask = new AllocateTimestampBatchTask(lastTimestamp);
 
@@ -110,7 +110,7 @@ public class WorldClockOracleImpl implements TimestampOracle {
         scheduler.schedule(allocateTimestampsBatchTask, 0, TimeUnit.MILLISECONDS);
 
         // Waiting for the current epoch to start. Occurs in case of failover when the previous TSO allocated the current time frame.
-        while ((System.currentTimeMillis() * MAX_TX_PER_MS) < this.lastTimestamp) {
+        while ((System.currentTimeMillis() * MAX_TX_PER_MS) < this.lastTimestamp) { // 等待当前时间戳对应的 maxTimestamp 超过上次的 maxTimestamp
             try {
                 Thread.sleep(1000);
             } catch (InterruptedException e) {
@@ -120,7 +120,7 @@ public class WorldClockOracleImpl implements TimestampOracle {
 
         // Launch the periodic timestamp interval allocation. In this case, the timestamp interval is extended even though the TSO is idle.
         // Because we are world time based, this guarantees that the first request after a long time does not need to wait for new interval allocation.
-        scheduler.scheduleAtFixedRate(allocateTimestampsBatchTask, TIMESTAMP_ALLOCATION_INTERVAL_MS, TIMESTAMP_ALLOCATION_INTERVAL_MS, TimeUnit.MILLISECONDS);
+        scheduler.scheduleAtFixedRate(allocateTimestampsBatchTask, TIMESTAMP_ALLOCATION_INTERVAL_MS, TIMESTAMP_ALLOCATION_INTERVAL_MS, TimeUnit.MILLISECONDS); // 分配线程，间隔 TIMESTAMP_ALLOCATION_INTERVAL_MS
     }
 
     /**
@@ -129,15 +129,15 @@ public class WorldClockOracleImpl implements TimestampOracle {
     @Override
     public long next() {
 
-        long currentMsFirstTimestamp = System.currentTimeMillis() * MAX_TX_PER_MS;
+        long currentMsFirstTimestamp = System.currentTimeMillis() * MAX_TX_PER_MS; // 通过当前时间乘以每毫秒的最大事务数来计算当前毫秒的第一个时间戳
 
-        lastTimestamp += CommitTable.MAX_CHECKPOINTS_PER_TXN;
+        lastTimestamp += CommitTable.MAX_CHECKPOINTS_PER_TXN; // TODO 一个事务能使用的时间戳数量MAX_CHECKPOINTS_PER_TXN？所以累加后返回给下一个事务
 
         // Return the next timestamp in case we are still in the same millisecond as the previous timestamp was. 
-        if (lastTimestamp >= currentMsFirstTimestamp) {
+        if (lastTimestamp >= currentMsFirstTimestamp) { // 如果lastTimestamp大于等于当前毫秒的第一个时间戳，直接返回lastTimestamp
             return lastTimestamp;
         }
-
+        // 当前 timestamp 的第一个时间戳 >= 最大时间戳.这里sleep等待 allocate 线程进行分配
         if (currentMsFirstTimestamp >= maxTimestamp) { // Intentional race to reduce synchronization overhead in every access to maxTimestamp                                                                                                                       
             while (maxAllocatedTime <= currentMsFirstTimestamp) { // Waiting for the interval allocation
                 try {

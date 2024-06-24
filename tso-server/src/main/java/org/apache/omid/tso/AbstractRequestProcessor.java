@@ -182,9 +182,9 @@ abstract class AbstractRequestProcessor implements EventHandler<AbstractRequestP
 
     private void handleTimestamp(RequestEvent requestEvent) throws Exception {
 
-        long timestamp = timestampOracle.next();
-        requestEvent.getMonCtx().timerStop("request.processor.timestamp.latency");
-        forwardTimestamp(timestamp, requestEvent.getChannel(), requestEvent.getMonCtx());
+        long timestamp = timestampOracle.next(); // 获取下一个时间戳
+        requestEvent.getMonCtx().timerStop("request.processor.timestamp.latency"); // 记录耗时
+        forwardTimestamp(timestamp, requestEvent.getChannel(), requestEvent.getMonCtx()); 
     }
 
     // Checks whether transaction transactionId started before a fence creation of a table transactionId modified.
@@ -206,9 +206,9 @@ abstract class AbstractRequestProcessor implements EventHandler<AbstractRequestP
 
  // Checks whether transactionId has a write-write conflict with a transaction committed after transactionId.
     private boolean hasConflictsWithCommittedTransactions(long startTimestamp, Iterable<Long> writeSet) {
-        for (long cellId : writeSet) {
-            long value = hashmap.getLatestWriteForCell(cellId);
-            if (value != 0 && value >= startTimestamp) {
+        for (long cellId : writeSet) { // 遍历当前事务的 writeSet
+            long value = hashmap.getLatestWriteForCell(cellId); // 获取 cellId 对应的最新 commit id
+            if (value != 0 && value >= startTimestamp) { // 最新的 commit id 在当前事务开启后提交的，说明和当前事务有 write 冲突
                 return true;
             }
         }
@@ -218,13 +218,13 @@ abstract class AbstractRequestProcessor implements EventHandler<AbstractRequestP
 
     private void handleCommit(RequestEvent event) throws Exception {
 
-        long startTimestamp = event.getStartTimestamp();
+        long startTimestamp = event.getStartTimestamp(); // 从事件中提取事务开始时间戳、写集合、表ID集合以及提交重试标志
         Iterable<Long> writeSet = event.writeSet();
         Collection<Long> tableIdSet = event.getTableIdSet();
         boolean isCommitRetry = event.isCommitRetry();
         Channel c = event.getChannel();
 
-        boolean nonEmptyWriteSet = writeSet.iterator().hasNext();
+        boolean nonEmptyWriteSet = writeSet.iterator().hasNext(); // 检查写集合是否为空，即事务是否有写操作
 
         // If the transaction started before the low watermark, or
         // it started before a fence and modified the table the fence created for, or
@@ -232,19 +232,19 @@ abstract class AbstractRequestProcessor implements EventHandler<AbstractRequestP
         // Then it should abort. Otherwise, it can commit.
         if (startTimestamp > lowWatermark &&
             !hasConflictsWithFences(startTimestamp, tableIdSet) &&
-            !hasConflictsWithCommittedTransactions(startTimestamp, writeSet)) {
+            !hasConflictsWithCommittedTransactions(startTimestamp, writeSet)) { // 检查事务是否满足提交条件
 
-            long commitTimestamp = timestampOracle.next();
+            long commitTimestamp = timestampOracle.next(); // 获取提交时间戳
             Optional<Long> forwardNewWaterMark = Optional.absent();
-            if (nonEmptyWriteSet) {
+            if (nonEmptyWriteSet) { // 写集合非空时，更新低水位线
                 long newLowWatermark = lowWatermark;
 
-                for (long r : writeSet) {
-                    long removed = hashmap.putLatestWriteForCell(r, commitTimestamp);
+                for (long r : writeSet) { // 遍历写集合中的每个元素，更新其最新的写入时间戳，并计算新的低水位线
+                    long removed = hashmap.putLatestWriteForCell(r, commitTimestamp); // 更新 cellId 对应的 commitTimestamp, 返回之前的 commitTimestamp
                     newLowWatermark = Math.max(removed, newLowWatermark);
                 }
 
-                if (newLowWatermark != lowWatermark) {
+                if (newLowWatermark != lowWatermark) { // 若低水位线有变化，记录日志并更新低水位线
                     LOG.trace("Setting new low Watermark to {}", newLowWatermark);
                     lowWatermark = newLowWatermark;
                     forwardNewWaterMark = Optional.of(lowWatermark);
@@ -257,9 +257,9 @@ abstract class AbstractRequestProcessor implements EventHandler<AbstractRequestP
 
             event.getMonCtx().timerStop("request.processor.commit.latency");
             if (isCommitRetry) { // Re-check if it was already committed but the client retried due to a lag replying
-                forwardCommitRetry(startTimestamp, c, event.getMonCtx());
+                forwardCommitRetry(startTimestamp, c, event.getMonCtx());  // 若是提交重试，再次检查是否已提交以避免因响应延迟导致的重复提交
             } else {
-                forwardAbort(startTimestamp, c, event.getMonCtx());
+                forwardAbort(startTimestamp, c, event.getMonCtx()); // 否则，中止事务
             }
 
         }
