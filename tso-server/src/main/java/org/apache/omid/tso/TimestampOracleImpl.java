@@ -121,7 +121,7 @@ public class TimestampOracleImpl implements TimestampOracle {
     @Override
     public void initialize() throws IOException {
 
-        this.lastTimestamp = this.maxTimestamp = storage.getMaxTimestamp();
+        this.lastTimestamp = this.maxTimestamp = storage.getMaxTimestamp(); // 从存储中获取 maxTimestamp
 
         this.allocateTimestampsBatchTask = new AllocateTimestampBatchTask(lastTimestamp);
 
@@ -137,23 +137,23 @@ public class TimestampOracleImpl implements TimestampOracle {
     @SuppressWarnings("StatementWithEmptyBody")
     @Override
     public long next() {
-        lastTimestamp += CommitTable.MAX_CHECKPOINTS_PER_TXN;
+        lastTimestamp += CommitTable.MAX_CHECKPOINTS_PER_TXN; // 新的时间戳
 
-        if (lastTimestamp >= nextAllocationThreshold) {
+        if (lastTimestamp >= nextAllocationThreshold) { // 当前时间戳 超过 分配阈值时 ,触发 batch 分配新时间戳
             // set the nextAllocationThread to max value of long in order to
             // make sure only one call to this function will execute a thread to extend the timestamp batch.
             nextAllocationThreshold = Long.MAX_VALUE; 
             executor.execute(allocateTimestampsBatchTask);
         }
 
-        if (lastTimestamp >= maxTimestamp) {
+        if (lastTimestamp >= maxTimestamp) { // 当 lastTimestamp 超过 当前已分配的最大时间戳 时，等待新一批时间戳被分配
             assert (maxTimestamp <= maxAllocatedTimestamp);
-            while (maxAllocatedTimestamp == maxTimestamp) {
+            while (maxAllocatedTimestamp == maxTimestamp) { // 自旋等待，直到已分配的最大时间戳被更新. maxAllocatedTimestamp 会在 batch 执行完毕时更新
                 // spin
             }
             assert (maxAllocatedTimestamp > maxTimestamp);
-            maxTimestamp = maxAllocatedTimestamp;
-            nextAllocationThreshold = maxTimestamp - TIMESTAMP_REMAINING_THRESHOLD;
+            maxTimestamp = maxAllocatedTimestamp; // 更新当前 max timestamp = 本次 batch 预分配的最大时间戳
+            nextAllocationThreshold = maxTimestamp - TIMESTAMP_REMAINING_THRESHOLD; // 计算下次分配的阈值
             assert (nextAllocationThreshold > lastTimestamp && nextAllocationThreshold < maxTimestamp);
             assert (lastTimestamp < maxTimestamp);
         }

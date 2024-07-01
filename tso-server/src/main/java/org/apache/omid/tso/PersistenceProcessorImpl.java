@@ -115,7 +115,7 @@ class PersistenceProcessorImpl implements PersistenceProcessor {
                                  Optional<Long> newLowWatermark)
             throws Exception {
 
-        currentBatch.addCommit(startTimestamp, commitTimestamp, c, monCtx, newLowWatermark);
+        currentBatch.addCommit(startTimestamp, commitTimestamp, c, monCtx, newLowWatermark); // 创建 event,添加到 current batch
         if (currentBatch.isFull()) {
             triggerCurrentBatchFlush();
         }
@@ -145,8 +145,8 @@ class PersistenceProcessorImpl implements PersistenceProcessor {
     public void addTimestampToBatch(long startTimestamp, Channel c, MonitoringContext monCtx) throws Exception {
 
         currentBatch.addTimestamp(startTimestamp, c, monCtx);
-        if (currentBatch.isFull()) {
-            triggerCurrentBatchFlush();
+        if (currentBatch.isFull()) { // batch 满了
+            triggerCurrentBatchFlush(); // flush batch
         }
 
     }

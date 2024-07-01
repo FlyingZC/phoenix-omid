@@ -206,9 +206,9 @@ abstract class AbstractRequestProcessor implements EventHandler<AbstractRequestP
 
  // Checks whether transactionId has a write-write conflict with a transaction committed after transactionId.
     private boolean hasConflictsWithCommittedTransactions(long startTimestamp, Iterable<Long> writeSet) {
-        for (long cellId : writeSet) { // 遍历当前事务的 writeSet
-            long value = hashmap.getLatestWriteForCell(cellId); // 获取 cellId 对应的最新 commit id
-            if (value != 0 && value >= startTimestamp) { // 最新的 commit id 在当前事务开启后提交的，说明和当前事务有 write 冲突
+        for (long cellId : writeSet) { // 遍历当前事务 writeSet 里的 cellIds,可能是 hash?
+            long value = hashmap.getLatestWriteForCell(cellId); // 获取 cellId 对应的最新 commit timestamp
+            if (value != 0 && value >= startTimestamp) { // 最新的 commit timestamp 在当前事务开启后提交的，说明和当前事务有 write 冲突
                 return true;
             }
         }
@@ -219,7 +219,7 @@ abstract class AbstractRequestProcessor implements EventHandler<AbstractRequestP
     private void handleCommit(RequestEvent event) throws Exception {
 
         long startTimestamp = event.getStartTimestamp(); // 从事件中提取事务开始时间戳、写集合、表ID集合以及提交重试标志
-        Iterable<Long> writeSet = event.writeSet();
+        Iterable<Long> writeSet = event.writeSet(); // 写入集，存储的是 cellIds
         Collection<Long> tableIdSet = event.getTableIdSet();
         boolean isCommitRetry = event.isCommitRetry();
         Channel c = event.getChannel();
@@ -240,8 +240,8 @@ abstract class AbstractRequestProcessor implements EventHandler<AbstractRequestP
                 long newLowWatermark = lowWatermark;
 
                 for (long r : writeSet) { // 遍历写集合中的每个元素，更新其最新的写入时间戳，并计算新的低水位线
-                    long removed = hashmap.putLatestWriteForCell(r, commitTimestamp); // 更新 cellId 对应的 commitTimestamp, 返回之前的 commitTimestamp
-                    newLowWatermark = Math.max(removed, newLowWatermark);
+                    long removed = hashmap.putLatestWriteForCell(r, commitTimestamp); // 更新 cellId 对应的 commitTimestamp, 返回之前的 oldest commitTimestamp
+                    newLowWatermark = Math.max(removed, newLowWatermark); // 新低水位线始终反映事务处理过程中的最大已提交时间戳!!!!!
                 }
 
                 if (newLowWatermark != lowWatermark) { // 若低水位线有变化，记录日志并更新低水位线

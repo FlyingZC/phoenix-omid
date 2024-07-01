@@ -122,8 +122,8 @@ public abstract class AbstractTransaction<T extends CellId> implements Transacti
             AbstractTransactionManager transactionManager,
             boolean isLowLatency) {
 
-        this.startTimestamp = this.writeTimestamp = transactionId;
-        this.readTimestamp = readTimestamp;
+        this.startTimestamp = this.writeTimestamp = transactionId; // start timestamp
+        this.readTimestamp = readTimestamp; // start timestamp
         this.epoch = epoch;
         this.writeSet = writeSet;
         this.conflictFreeWriteSet = conflictFreeWriteSet;

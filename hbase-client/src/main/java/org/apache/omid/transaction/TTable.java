@@ -444,7 +444,7 @@ public class TTable implements Closeable {
         if (conflictFree) {
             transaction.addConflictFreeWriteSetElement(cellId);
         } else {
-            transaction.addWriteSetElement(cellId);
+            transaction.addWriteSetElement(cellId); // 添加到 write set
         }
         
     }

@@ -148,7 +148,7 @@ public abstract class AbstractTransactionManager implements TransactionManager {
                 startTimestampTimer.stop();
             }
 
-            AbstractTransaction<? extends CellId> tx = transactionFactory.createTransaction(startTimestamp, epoch, this);
+            AbstractTransaction<? extends CellId> tx = transactionFactory.createTransaction(startTimestamp, epoch, this); // 创建事务
 
             postBegin(tx);
 

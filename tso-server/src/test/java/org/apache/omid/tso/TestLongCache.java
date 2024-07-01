@@ -108,4 +108,14 @@ public class TestLongCache {
         assertTrue(avgGap > entries * 0.6, "avgGap should be greater than entries * 0.6");
 
     }
+    
+    @Test
+    public void testPutOneKey() {
+        LongCache cache = new LongCache(100, 4);
+        for (int i = 0; i < 20; i++) {
+            cache.set(1, i + 1000);
+            cache.set(101, i + 1000);
+            cache.set(201, i + 1000);
+        }
+    }
 }

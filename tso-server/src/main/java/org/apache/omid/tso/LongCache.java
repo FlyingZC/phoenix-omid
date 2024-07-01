@@ -30,32 +30,32 @@ public class LongCache {
     }
 
     public long set(long key, long value) {
-        final int index = index(key);
+        final int index = index(key); // key取模返回下标，可能会冲突
         int oldestIndex = 0;
         long oldestValue = Long.MAX_VALUE;
         for (int i = 0; i < associativity; ++i) {
-            int currIndex = 2 * (index + i);
-            if (cache[currIndex] == key) { // key的存储位置.如果找到key一样的,直接替换数组里原有的值
-                oldestValue = 0;
+            int currIndex = 2 * (index + i); // key 下标
+            if (cache[currIndex] == key) { // key的存储位置.如果找到key一样的cellId(缓存命中),直接替换数组里原有的值
+                oldestValue = 0; // 替换场景，返回 oldestValue=0
                 oldestIndex = currIndex;
                 break;
             }
-            if (cache[currIndex + 1] <= oldestValue) { // value的存储位置(currIndex + 1)
+            if (cache[currIndex + 1] <= oldestValue) { // 新插入场景.value的存储位置(currIndex + 1)
                 oldestValue = cache[currIndex + 1];
                 oldestIndex = currIndex;
             }
         }
-        cache[oldestIndex] = key;
-        cache[oldestIndex + 1] = value;
-        return oldestValue;
+        cache[oldestIndex] = key; // 缓存 key
+        cache[oldestIndex + 1] = value; // 缓存 value
+        return oldestValue; // 返回 old value
     }
 
     public long get(long key) {
         final int index = index(key);
         for (int i = 0; i < associativity; ++i) { // associativity 里存储的元素key应该是相同的
-            int currIndex = 2 * (index + i);
-            if (cache[currIndex] == key) {
-                return cache[currIndex + 1];
+            int currIndex = 2 * (index + i); // 计算 key 的下标
+            if (cache[currIndex] == key) { // 找到 cache key
+                return cache[currIndex + 1]; // 返回对应的 value
             }
         }
         return 0;
