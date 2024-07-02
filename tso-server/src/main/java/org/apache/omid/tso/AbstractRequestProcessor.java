@@ -251,9 +251,9 @@ abstract class AbstractRequestProcessor implements EventHandler<AbstractRequestP
                 }
             }
             event.getMonCtx().timerStop("request.processor.commit.latency");
-            forwardCommit(startTimestamp, commitTimestamp, c, event.getMonCtx(), forwardNewWaterMark);
+            forwardCommit(startTimestamp, commitTimestamp, c, event.getMonCtx(), forwardNewWaterMark); // 持久化 commit 请求
 
-        } else {
+        } else { // 事务不满足提交条件
 
             event.getMonCtx().timerStop("request.processor.commit.latency");
             if (isCommitRetry) { // Re-check if it was already committed but the client retried due to a lag replying

@@ -30,7 +30,7 @@ public class LongCache {
     }
 
     public long set(long key, long value) {
-        final int index = index(key); // key取模返回下标，可能会冲突
+        final int index = index(key); // cellId 取模返回下标，可能会冲突
         int oldestIndex = 0;
         long oldestValue = Long.MAX_VALUE;
         for (int i = 0; i < associativity; ++i) {
@@ -40,7 +40,7 @@ public class LongCache {
                 oldestIndex = currIndex;
                 break;
             }
-            if (cache[currIndex + 1] <= oldestValue) { // 新插入场景.value的存储位置(currIndex + 1)
+            if (cache[currIndex + 1] <= oldestValue) { // 没找到相同的key.新插入场景.value的存储位置(currIndex + 1).通过和 oldestValue 比较会将最小的 timestamp 剔除
                 oldestValue = cache[currIndex + 1];
                 oldestIndex = currIndex;
             }
