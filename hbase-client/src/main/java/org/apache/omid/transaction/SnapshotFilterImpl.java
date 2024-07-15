@@ -309,7 +309,7 @@ public class SnapshotFilterImpl implements SnapshotFilter {
         Map<Long, Long> commitCache = new HashMap<>();
 
         for (Cell cell : rawCells) {
-            if (CellUtils.isShadowCell(cell)) {
+            if (CellUtils.isShadowCell(cell)) { // 结果里只保留 shadow cell
                 commitCache.put(cell.getTimestamp(), Bytes.toLong(CellUtil.cloneValue(cell)));
             }
         }
@@ -425,7 +425,7 @@ public class SnapshotFilterImpl implements SnapshotFilter {
         List<Cell> keyValuesInSnapshot = new ArrayList<>();
         List<Get> pendingGetsList = new ArrayList<>();
 
-        int numberOfVersionsToFetch = versionsToRequest * 2;
+        int numberOfVersionsToFetch = versionsToRequest * 2; // 每次获取的快照数量
         if (numberOfVersionsToFetch < 1) {
             numberOfVersionsToFetch = versionsToRequest;
         }

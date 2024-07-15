@@ -204,7 +204,7 @@ public class HBaseTransactionManager extends AbstractTransactionManager implemen
         try {
             // Flush all pending writes
             HBaseTransaction hBaseTx = enforceHBaseTransactionAsParam(transaction);
-            hBaseTx.flushTables();
+            hBaseTx.flushTables(); // 事务提交之前，如果有没有 flush 的数据，先 flush
         } catch (IOException e) {
             throw new TransactionManagerException("Exception while flushing writes", e);
         }

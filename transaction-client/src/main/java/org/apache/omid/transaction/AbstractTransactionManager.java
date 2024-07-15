@@ -247,7 +247,7 @@ public abstract class AbstractTransactionManager implements TransactionManager {
                     if (tsoClient.isLowLatency())
                         commitLowLatencyTransaction(tx);
                     else
-                        commitRegularTransaction(tx);
+                        commitRegularTransaction(tx); // 提交事务
                 }
                 committedTxsCounter.inc();
             } finally {
@@ -398,8 +398,8 @@ public abstract class AbstractTransactionManager implements TransactionManager {
 
         try {
 
-            long commitTs = tsoClient.commit(tx.getStartTimestamp(), tx.getWriteSet(), tx.getConflictFreeWriteSet()).get();
-            certifyCommitForTx(tx, commitTs);
+            long commitTs = tsoClient.commit(tx.getStartTimestamp(), tx.getWriteSet(), tx.getConflictFreeWriteSet()).get(); // 通过 tso 获取 commit timestamp, tso 会做冲突检测
+            certifyCommitForTx(tx, commitTs); // 设置事务状态 committed 和 commit timestamp
             updateShadowCellsAndRemoveCommitTableEntry(tx, postCommitter);
 
         } catch (ExecutionException e) {

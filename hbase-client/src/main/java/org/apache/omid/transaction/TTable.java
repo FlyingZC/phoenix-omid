@@ -192,12 +192,12 @@ public class TTable implements Closeable {
 
         HBaseTransaction transaction = enforceHBaseTransactionAsParam(tx);
 
-        final long readTimestamp = transaction.getReadTimestamp();
+        final long readTimestamp = transaction.getReadTimestamp(); // 获取当前事务的 read timestamp(默认就是 start timestamp)
         final Get tsget = new Get(get.getRow()).setFilter(get.getFilter());
         propagateAttributes(get, tsget);
-        TimeRange timeRange = get.getTimeRange();
+        TimeRange timeRange = get.getTimeRange(); // 默认是从 0 ～ Long.MAX_VALUE
         long startTime = timeRange.getMin();
-        long endTime = Math.min(timeRange.getMax(), readTimestamp + 1);
+        long endTime = Math.min(timeRange.getMax(), readTimestamp + 1); // 更新 max 为 readTimestamp + 1
         tsget.setTimeRange(startTime, endTime).readVersions(1);
         Map<byte[], NavigableSet<byte[]>> kvs = get.getFamilyMap();
         for (Map.Entry<byte[], NavigableSet<byte[]>> entry : kvs.entrySet()) {
@@ -405,10 +405,10 @@ public class TTable implements Closeable {
 
         HBaseTransaction transaction = enforceHBaseTransactionAsParam(tx);
 
-        final long writeTimestamp = transaction.getWriteTimestamp();
+        final long writeTimestamp = transaction.getWriteTimestamp(); // write timestamp
 
         // create put with correct ts
-        final Put tsput = new Put(put.getRow(), writeTimestamp);
+        final Put tsput = new Put(put.getRow(), writeTimestamp); // 重新设置 write timestamp
         propagateAttributes(put, tsput);
         Map<byte[], List<Cell>> kvs = put.getFamilyCellMap();
         for (List<Cell> kvl : kvs.values()) {
@@ -450,7 +450,7 @@ public class TTable implements Closeable {
     }
 
     private void addMutation(Mutation m) throws IOException {
-        this.mutations.add(m);
+        this.mutations.add(m); // mutations 缓存 crud 操作
         if (autoFlush) {
             flushCommits();
         }

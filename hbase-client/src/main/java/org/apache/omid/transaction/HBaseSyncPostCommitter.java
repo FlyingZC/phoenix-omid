@@ -106,7 +106,7 @@ public class HBaseSyncPostCommitter implements PostCommitActions {
         try {
             Map<TableName,List<Mutation>> mutations = new HashMap<>();
             // Add shadow cells
-            for (HBaseCellId cell : tx.getWriteSet()) {
+            for (HBaseCellId cell : tx.getWriteSet()) { // 遍历 write set
                 addShadowCell(cell, tx, updateSCFuture, mutations);
             }
 

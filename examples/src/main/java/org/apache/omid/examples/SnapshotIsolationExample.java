@@ -38,17 +38,17 @@ import org.apache.phoenix.thirdparty.com.google.common.base.Preconditions;
 
 /**
  * ****************************************************************************************************************
- *
+ * 在并发写入共享数据时保持快照隔离
  * Example code which demonstrates the preservation of Snapshot Isolation when writing shared data concurrently
  *
  * ****************************************************************************************************************
  *
  * Please @see{BasicExample} first
- *
+ * 两个并发事务（Tx1和Tx2）尝试更新HBase中的同一列。这将导致Tx2回滚(最后一个尝试提交的事务,由于与之前已提交的事务Tx1在写入集上的冲突)
  * In the code below, two concurrent transactions (Tx1 and Tx2), try to update the same column in HBase. This will
  * result in the rollback of Tx2 -the last one trying to commit- due to conflicts in the writeset with the previously
  * committed transaction Tx1. Also shows how Tx2 reads the right values from its own snapshot in HBase data.
- *
+ * 展示了Tx2如何从其在HBase数据中的快照读取正确的值
  * After building the package with 'mvn clean package' find the resulting examples-{version}-bin.tar.gz file in the
  * 'examples/target' folder. Copy it to the target host and expand with 'tar -zxvf examples-{version}-bin.tar.gz'.
  *
@@ -129,7 +129,7 @@ public class SnapshotIsolationExample {
         byte[] rowId = rowIdGenerator.getRowId();
         Put initialPut = new Put(rowId);
         initialPut.addColumn(family, qualifier, initialData);
-        txTable.put(tx0, initialPut);
+        txTable.put(tx0, initialPut); // 事务性插入数据
         tm.commit(tx0);
         LOG.info("Initial Transaction {} COMMITTED. Base value written in {}:{}/{}/{} = {}",
                  tx0, userTableName, Bytes.toString(rowId), Bytes.toString(family),
