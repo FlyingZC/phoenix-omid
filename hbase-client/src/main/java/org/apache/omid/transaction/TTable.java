@@ -197,7 +197,7 @@ public class TTable implements Closeable {
         propagateAttributes(get, tsget);
         TimeRange timeRange = get.getTimeRange(); // 默认是从 0 ～ Long.MAX_VALUE
         long startTime = timeRange.getMin();
-        long endTime = Math.min(timeRange.getMax(), readTimestamp + 1); // 更新 max 为 readTimestamp + 1
+        long endTime = Math.min(timeRange.getMax(), readTimestamp + 1); // 更新 max 为 readTimestamp + 1, 只读取当前事务启动和启动之前的版本的数据
         tsget.setTimeRange(startTime, endTime).readVersions(1);
         Map<byte[], NavigableSet<byte[]>> kvs = get.getFamilyMap();
         for (Map.Entry<byte[], NavigableSet<byte[]>> entry : kvs.entrySet()) {
@@ -405,7 +405,7 @@ public class TTable implements Closeable {
 
         HBaseTransaction transaction = enforceHBaseTransactionAsParam(tx);
 
-        final long writeTimestamp = transaction.getWriteTimestamp(); // write timestamp
+        final long writeTimestamp = transaction.getWriteTimestamp(); // write timestamp(默认就是 start timestamp)
 
         // create put with correct ts
         final Put tsput = new Put(put.getRow(), writeTimestamp); // 重新设置 write timestamp

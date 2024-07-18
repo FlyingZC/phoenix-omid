@@ -78,7 +78,7 @@ public class HBaseSyncPostCommitter implements PostCommitActions {
         put.addColumn(cell.getFamily(),
                 CellUtils.addShadowCellSuffixPrefix(cell.getQualifier(), 0, cell.getQualifier().length),
                 cell.getTimestamp(),
-                Bytes.toBytes(tx.getCommitTimestamp()));
+                Bytes.toBytes(tx.getCommitTimestamp())); // 包含写时间戳(默认就是 startTimestamp) 和 commitTimestamp
 
         TableName table = cell.getTable().getHTable().getName();
         List<Mutation> tableMutations = mutations.get(table);
@@ -94,7 +94,7 @@ public class HBaseSyncPostCommitter implements PostCommitActions {
             }
         }
     }
-
+    // 根据 write set 插入 shadow cells
     @Override
     public ListenableFuture<Void> updateShadowCells(AbstractTransaction<? extends CellId> transaction) {
 
@@ -142,7 +142,7 @@ public class HBaseSyncPostCommitter implements PostCommitActions {
         commitTableUpdateTimer.start();
 
         try {
-            commitTableClient.deleteCommitEntry(tx.getStartTimestamp()).get();
+            commitTableClient.deleteCommitEntry(tx.getStartTimestamp()).get(); // 根据事务的 startTimestamp 删除 commitTable 记录
             updateSCFuture.set(null);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

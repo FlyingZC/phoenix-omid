@@ -148,7 +148,7 @@ public class SnapshotFilterImpl implements SnapshotFilter {
         return commitTS;
     }
 
-    /**
+    /** 找特定cell的提交时间戳.通过缓存、提交表、shadow cell等途径查找提交时间戳
      * This function returns the commit timestamp for a particular cell if the transaction was already committed in
      * the system. In case the transaction was not committed and the cell was written by transaction initialized by a
      * previous TSO server, an invalidation try occurs.
@@ -167,13 +167,13 @@ public class SnapshotFilterImpl implements SnapshotFilter {
                                                      CommitTimestampLocator locator, boolean isLowLatency) throws IOException {
 
         try {
-            // 1) First check the cache
+            // 1) First check the cache 从内存缓存里获取
             Optional<Long> commitTimestamp = locator.readCommitTimestampFromCache(cellStartTimestamp);
             if (commitTimestamp.isPresent()) { // Valid commit timestamp
                 return new CommitTimestamp(CACHE, commitTimestamp.get(), true);
             }
 
-            // 2) Then check the commit table
+            // 2) Then check the commit table 从 commit table 查询
             // If the data was written at a previous epoch, check whether the transaction was invalidated
             boolean invalidatedByOther = false;
             Optional<CommitTimestamp> commitTimestampFromCT = commitTableClient.getCommitTimestamp(cellStartTimestamp).get();
@@ -184,7 +184,7 @@ public class SnapshotFilterImpl implements SnapshotFilter {
                     return commitTimestampFromCT.get();
             }
 
-            // 3) Read from shadow cell
+            // 3) Read from shadow cell 从 shadow cell 里查询
             Optional<CommitTimestamp> commitTimeStamp = readCommitTimestampFromShadowCell(cellStartTimestamp, locator);
             if (commitTimeStamp.isPresent()) {
                 return commitTimeStamp.get();
@@ -289,7 +289,7 @@ public class SnapshotFilterImpl implements SnapshotFilter {
     private Optional<Long> getCommitTimestamp(Cell kv, HBaseTransaction transaction, Map<Long, Long> commitCache)
             throws IOException {
 
-        long startTimestamp = transaction.getStartTimestamp();
+        long startTimestamp = transaction.getStartTimestamp(); // 当前事务的 start timestamp
 
         if (kv.getTimestamp() == startTimestamp) {
             return Optional.of(startTimestamp);
@@ -310,7 +310,7 @@ public class SnapshotFilterImpl implements SnapshotFilter {
 
         for (Cell cell : rawCells) {
             if (CellUtils.isShadowCell(cell)) { // 结果里只保留 shadow cell
-                commitCache.put(cell.getTimestamp(), Bytes.toLong(CellUtil.cloneValue(cell)));
+                commitCache.put(cell.getTimestamp(), Bytes.toLong(CellUtil.cloneValue(cell))); // key: timestamp; value: cell value(commitTimestamp)
             }
         }
 
@@ -366,7 +366,7 @@ public class SnapshotFilterImpl implements SnapshotFilter {
         }
     }
 
-
+    // 判断 cell 是否在给定 transaction 里, 如果 kv 的 timestamp 在当前事务的 startTimestamp 和 readTimestamp 内(正常两个值一样)，则属于当前事务
     public Optional<Long> getTSIfInTransaction(Cell kv, HBaseTransaction transaction) {
         long startTimestamp = transaction.getStartTimestamp();
         long readTimestamp = transaction.getReadTimestamp();
@@ -401,7 +401,7 @@ public class SnapshotFilterImpl implements SnapshotFilter {
                                                                                        cell.getQualifierOffset(),
                                                                                        cell.getQualifierLength()));
         pendingGet.readVersions(versionCount);
-        pendingGet.setTimeRange(0, cell.getTimestamp());
+        pendingGet.setTimeRange(0, cell.getTimestamp()); // 设置时间范围 0~shadow cell的start(write) timestamp
 
         return pendingGet;
     }
@@ -430,23 +430,23 @@ public class SnapshotFilterImpl implements SnapshotFilter {
             numberOfVersionsToFetch = versionsToRequest;
         }
 
-        Map<Long, Long> commitCache = buildCommitCache(rawCells);
+        Map<Long, Long> commitCache = buildCommitCache(rawCells); // 提交事务的 shadow cell 的 timestamp -> cell value (shadow cell 的 value 存储的是 commitTimestamp)映射
         buildFamilyDeletionCache(transaction, rawCells, familyDeletionCache, commitCache, attributeMap);
 
         ImmutableList<Collection<Cell>> filteredCells;
         if (transaction.getVisibilityLevel() == VisibilityLevel.SNAPSHOT_ALL) {
             filteredCells = groupCellsByColumnFilteringShadowCells(rawCells);
         } else {
-            filteredCells = groupCellsByColumnFilteringShadowCellsAndFamilyDeletion(rawCells);
+            filteredCells = groupCellsByColumnFilteringShadowCellsAndFamilyDeletion(rawCells); // 过滤出非 shadow cells
         }
-
+        
         for (Collection<Cell> columnCells : filteredCells) {
             boolean snapshotValueFound = false;
             Cell oldestCell = null;
-            for (Cell cell : columnCells) {
+            for (Cell cell : columnCells) { // 遍历非 shadow cell,当前cell可能已经被进行中的尚未提交的其他事务修改过了
                 oldestCell = cell;
-                if (getTSIfInTransaction(cell, transaction).isPresent() ||
-                        getTSIfInSnapshot(cell, transaction, commitCache).isPresent()) {
+                if (getTSIfInTransaction(cell, transaction).isPresent() || // cell 是否在当前事务内
+                        getTSIfInSnapshot(cell, transaction, commitCache).isPresent()) { // cell 有快照
 
                     if (transaction.getVisibilityLevel() == VisibilityLevel.SNAPSHOT_ALL) {
                         keyValuesInSnapshot.add(cell);
@@ -468,9 +468,9 @@ public class SnapshotFilterImpl implements SnapshotFilter {
                     }
                 }
             }
-            if (!snapshotValueFound) {
+            if (!snapshotValueFound) { // 上面没找到
                 assert (oldestCell != null);
-                Get pendingGet = createPendingGet(oldestCell, numberOfVersionsToFetch);
+                Get pendingGet = createPendingGet(oldestCell, numberOfVersionsToFetch); // 根据 oldestCell 继续查找
                 for (Map.Entry<String,byte[]> entry : attributeMap.entrySet()) {
                     pendingGet.setAttribute(entry.getKey(), entry.getValue());
                 }
@@ -495,7 +495,7 @@ public class SnapshotFilterImpl implements SnapshotFilter {
 
     @Override
     public Result get(Get get, HBaseTransaction transaction) throws IOException {
-        Result result = tableAccessWrapper.get(get);
+        Result result = tableAccessWrapper.get(get); // 根据时间戳查询对应 row
 
         List<Cell> filteredKeyValues = Collections.emptyList();
         if (!result.isEmpty()) {
@@ -550,7 +550,7 @@ public class SnapshotFilterImpl implements SnapshotFilter {
             @Override
             public boolean apply(Cell cell) {
                 boolean familyDeletionMarkerCondition = CellUtils.isFamilyDeleteCell(cell);
-
+                // 非 shadow cell, 非 deletion
                 return cell != null && !CellUtils.isShadowCell(cell) && !familyDeletionMarkerCondition;
             }
 

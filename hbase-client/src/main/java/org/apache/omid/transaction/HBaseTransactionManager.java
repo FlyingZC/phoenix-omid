@@ -282,7 +282,7 @@ public class HBaseTransactionManager extends AbstractTransactionManager implemen
 
         @Override
         public Optional<Long> readCommitTimestampFromCache(long startTimestamp) {
-            if (commitCache.containsKey(startTimestamp)) {
+            if (commitCache.containsKey(startTimestamp)) { // commit cache 里存储的是已经提交事务的 shadow cell 的 timestamp -> cell映射
                 return Optional.of(commitCache.get(startTimestamp));
             }
             return Optional.absent();
@@ -291,12 +291,12 @@ public class HBaseTransactionManager extends AbstractTransactionManager implemen
         @Override
         public Optional<Long> readCommitTimestampFromShadowCell(long startTimestamp) throws IOException {
 
-            Get get = new Get(hBaseCellId.getRow());
+            Get get = new Get(hBaseCellId.getRow()); // 指定行
             byte[] family = hBaseCellId.getFamily();
             byte[] shadowCellQualifier = CellUtils.addShadowCellSuffixPrefix(hBaseCellId.getQualifier());
             get.addColumn(family, shadowCellQualifier);
             get.readVersions(1);
-            get.setTimestamp(startTimestamp);
+            get.setTimestamp(startTimestamp); // 根据 timestamp 查询 shadow cell
             Result result = tableAccessWrapper.get(get);
             if (result.containsColumn(family, shadowCellQualifier)) {
                 return Optional.of(Bytes.toLong(result.getValue(family, shadowCellQualifier)));
