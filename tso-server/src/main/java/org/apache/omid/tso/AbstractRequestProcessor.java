@@ -230,7 +230,7 @@ abstract class AbstractRequestProcessor implements EventHandler<AbstractRequestP
         // it started before a fence and modified the table the fence created for, or
         // it has a write-write conflict with a transaction committed after it started
         // Then it should abort. Otherwise, it can commit.
-        if (startTimestamp > lowWatermark &&
+        if (startTimestamp > lowWatermark && // TODO 如果 startTimestamp <= lowWatermark 一定有冲突,因为下面  commitTimestamp 缓存里的值都比 lowWatermark 要大
             !hasConflictsWithFences(startTimestamp, tableIdSet) &&
             !hasConflictsWithCommittedTransactions(startTimestamp, writeSet)) { // 检查事务是否满足提交条件
 
@@ -241,7 +241,7 @@ abstract class AbstractRequestProcessor implements EventHandler<AbstractRequestP
 
                 for (long r : writeSet) { // 遍历写集合中的每个元素，更新其最新的写入时间戳，并计算新的低水位线
                     long removed = hashmap.putLatestWriteForCell(r, commitTimestamp); // 更新 cellId 对应的 commitTimestamp, 返回之前的 oldest commitTimestamp
-                    newLowWatermark = Math.max(removed, newLowWatermark); // 新低水位线始终反映事务处理过程中的最大已提交时间戳!!!!!
+                    newLowWatermark = Math.max(removed, newLowWatermark); // 新低水位线始终反映事务处理过程中的最大已提交时间戳!!!!!所有事务里写的所有write set 都会走这里判断,所以这个这个值是对的
                 }
 
                 if (newLowWatermark != lowWatermark) { // 若低水位线有变化，记录日志并更新低水位线

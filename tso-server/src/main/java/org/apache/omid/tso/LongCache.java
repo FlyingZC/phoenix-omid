@@ -29,7 +29,7 @@ public class LongCache {
         this.associativity = associativity;
     }
 
-    public long set(long key, long value) {
+    public long set(long key, long value) { // 1.若 key 相同,替换场景,由于没有淘汰时间戳,返回0;2.若 key 不相同,则找到 oldest 替换并返回淘汰的 oldest
         final int index = index(key); // cellId 取模返回下标，可能会冲突
         int oldestIndex = 0;
         long oldestValue = Long.MAX_VALUE;

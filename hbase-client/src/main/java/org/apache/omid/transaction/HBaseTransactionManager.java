@@ -282,7 +282,7 @@ public class HBaseTransactionManager extends AbstractTransactionManager implemen
 
         @Override
         public Optional<Long> readCommitTimestampFromCache(long startTimestamp) {
-            if (commitCache.containsKey(startTimestamp)) { // commit cache 里存储的是已经提交事务的 shadow cell 的 timestamp -> cell映射
+            if (commitCache.containsKey(startTimestamp)) { // commit cache 里存储的是已经提交事务的 shadow cell 的 timestamp -> cell 映射
                 return Optional.of(commitCache.get(startTimestamp));
             }
             return Optional.absent();

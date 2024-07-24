@@ -186,7 +186,7 @@ public class SnapshotIsolationExample {
             Bytes.toString(qualifier), Bytes.toString(dataValue1), tx1);
 
         // ... and when committing, Tx2 has to abort due to concurrent conflicts with committed transaction Tx1
-        try {
+        try { // t2 虽然是在 t1 之后开的事务,但是 t1 在 t2 之前提交了,所以这里冲突检测到有 t2 开启之后相同行的修改
             LOG.info("Concurrent Transaction {} TRYING TO COMMIT", tx2);
             tm.commit(tx2);
             // should throw an exception

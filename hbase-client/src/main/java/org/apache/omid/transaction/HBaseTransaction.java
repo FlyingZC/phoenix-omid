@@ -84,7 +84,7 @@ public class HBaseTransaction extends AbstractTransaction<HBaseCellId> {
 
         try {
             for (final HBaseCellId cell : getWriteSet()) {
-                deleteCell(cell, mutations);
+                deleteCell(cell, mutations); // 删除 write set
             }
 
             for (final HBaseCellId cell : getConflictFreeWriteSet()) {

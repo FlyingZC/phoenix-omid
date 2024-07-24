@@ -208,7 +208,7 @@ public class TTable implements Closeable {
             } else {
                 for (byte[] qualifier : qualifiers) {
                     tsget.addColumn(family, qualifier);
-                    tsget.addColumn(family, CellUtils.addShadowCellSuffixPrefix(qualifier));
+                    tsget.addColumn(family, CellUtils.addShadowCellSuffixPrefix(qualifier)); // 添加查询 shadow cell 条件
                 }
                 tsget.addColumn(family, CellUtils.FAMILY_DELETE_QUALIFIER);
                 tsget.addColumn(family, CellUtils.addShadowCellSuffixPrefix(CellUtils.FAMILY_DELETE_QUALIFIER));

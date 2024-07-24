@@ -398,14 +398,14 @@ public abstract class AbstractTransactionManager implements TransactionManager {
 
         try {
 
-            long commitTs = tsoClient.commit(tx.getStartTimestamp(), tx.getWriteSet(), tx.getConflictFreeWriteSet()).get(); // 通过 tso 获取 commit timestamp, tso 会做冲突检测
+            long commitTs = tsoClient.commit(tx.getStartTimestamp(), tx.getWriteSet(), tx.getConflictFreeWriteSet()).get(); // 通过 tso 获取 commit timestamp, tso 会做冲突检测&写入OMID_COMMIT_TABLE
             certifyCommitForTx(tx, commitTs); // 设置事务状态 committed 和 commit timestamp
-            updateShadowCellsAndRemoveCommitTableEntry(tx, postCommitter);
+            updateShadowCellsAndRemoveCommitTableEntry(tx, postCommitter); // 更新 shadow cell & remove commit table record
 
-        } catch (ExecutionException e) {
+        } catch (ExecutionException e) { // 调用 tso 事务提交异常了,和其他事务写冲突了
 
             if (e.getCause() instanceof AbortException) { // TSO reports Tx conflicts as AbortExceptions in the future
-                rollback(tx);
+                rollback(tx); // 回滚当前事务
                 rolledbackTxsCounter.inc();
                 throw new RollbackException(tx.getStartTimestamp() + ": Conflicts detected in writeset", e.getCause());
             }

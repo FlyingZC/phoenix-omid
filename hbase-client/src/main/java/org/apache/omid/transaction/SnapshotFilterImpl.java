@@ -148,7 +148,7 @@ public class SnapshotFilterImpl implements SnapshotFilter {
         return commitTS;
     }
 
-    /** 找特定cell的提交时间戳.通过缓存、提交表、shadow cell等途径查找提交时间戳
+    /** 找特定cell的提交时间戳.通过缓存、提交表、shadow cell等途径查找提交时间戳.
      * This function returns the commit timestamp for a particular cell if the transaction was already committed in
      * the system. In case the transaction was not committed and the cell was written by transaction initialized by a
      * previous TSO server, an invalidation try occurs.
@@ -248,7 +248,7 @@ public class SnapshotFilterImpl implements SnapshotFilter {
 
         CommitTimestamp tentativeCommitTimestamp =
                 locateCellCommitTimestamp(
-                        cell.getTimestamp(),
+                        cell.getTimestamp(), // 传入当前 cell 的 startTimestamp
                         epoch,
                         new CommitTimestampLocatorImpl(
                                 new HBaseCellId(null,
@@ -276,7 +276,7 @@ public class SnapshotFilterImpl implements SnapshotFilter {
             return Optional.of(tentativeCommitTimestamp.getValue());
         case CACHE:
         case SHADOW_CELL:
-            return Optional.of(tentativeCommitTimestamp.getValue());
+            return Optional.of(tentativeCommitTimestamp.getValue()); // 从 cache 或 shadow cell 里读取到结果,返回对应的 commit timestamp
         case NOT_PRESENT:
             return Optional.absent();
         default:
@@ -301,7 +301,7 @@ public class SnapshotFilterImpl implements SnapshotFilter {
         }
 
         return tryToLocateCellCommitTimestamp(transaction.getEpoch(), kv,
-                commitCache, transaction.isLowLatency());
+                commitCache, transaction.isLowLatency()); // 根据当前 cell 的 startTimestamp 查找 commitTimestamp
     }
     
     private Map<Long, Long> buildCommitCache(List<Cell> rawCells) {
@@ -374,7 +374,7 @@ public class SnapshotFilterImpl implements SnapshotFilter {
         // A cell was written by a transaction if its timestamp is larger than its startTimestamp and smaller or equal to its readTimestamp.
         // There also might be a case where the cell was written by the transaction and its timestamp equals to its writeTimestamp, however,
         // this case occurs after checkpoint and in this case we do not want to read this data.
-        if (kv.getTimestamp() >= startTimestamp && kv.getTimestamp() <= readTimestamp) {
+        if (kv.getTimestamp() >= startTimestamp && kv.getTimestamp() <= readTimestamp) { // 当前 cell 的时间戳在给定事务范围内
             return Optional.of(kv.getTimestamp());
         }
 
@@ -386,7 +386,7 @@ public class SnapshotFilterImpl implements SnapshotFilter {
         throws IOException {
 
         Optional<Long> commitTimestamp = getCommitTimestamp(kv, transaction, commitCache);
-
+        // 快照的 commitTimestamp 肯定小于当前事务的 startTimestamp
         if (commitTimestamp.isPresent() && commitTimestamp.get() < transaction.getStartTimestamp())
             return commitTimestamp;
 
@@ -399,9 +399,9 @@ public class SnapshotFilterImpl implements SnapshotFilter {
         pendingGet.addColumn(CellUtil.cloneFamily(cell), CellUtil.cloneQualifier(cell));
         pendingGet.addColumn(CellUtil.cloneFamily(cell), CellUtils.addShadowCellSuffixPrefix(cell.getQualifierArray(),
                                                                                        cell.getQualifierOffset(),
-                                                                                       cell.getQualifierLength()));
-        pendingGet.readVersions(versionCount);
-        pendingGet.setTimeRange(0, cell.getTimestamp()); // 设置时间范围 0~shadow cell的start(write) timestamp
+                                                                                       cell.getQualifierLength())); // 查询条件包括 shadow cell
+        pendingGet.readVersions(versionCount); // 查询返回的版本数量
+        pendingGet.setTimeRange(0, cell.getTimestamp()); // 设置时间范围 0~当前 cell 的 start(write) timestamp
 
         return pendingGet;
     }
@@ -460,17 +460,17 @@ public class SnapshotFilterImpl implements SnapshotFilter {
                     } else {
                         if (!checkFamilyDeletionCache(cell, transaction, familyDeletionCache, commitCache) &&
                                 !CellUtils.isTombstone(cell)) {
-                            keyValuesInSnapshot.add(cell);
+                            keyValuesInSnapshot.add(cell); // cell在可以读取的快照里
                         }
                         snapshotValueFound = true;
-                        break;
+                        break; // 找到一个最新的读取快照就不往下找了
 
                     }
                 }
             }
             if (!snapshotValueFound) { // 上面没找到
                 assert (oldestCell != null);
-                Get pendingGet = createPendingGet(oldestCell, numberOfVersionsToFetch); // 根据 oldestCell 继续查找
+                Get pendingGet = createPendingGet(oldestCell, numberOfVersionsToFetch); // 根据 oldestCell 继续查找,每次获取2个之前的快照版本
                 for (Map.Entry<String,byte[]> entry : attributeMap.entrySet()) {
                     pendingGet.setAttribute(entry.getKey(), entry.getValue());
                 }
@@ -483,7 +483,7 @@ public class SnapshotFilterImpl implements SnapshotFilter {
             for (Result pendingGetResult : pendingGetsResults) {
                 if (!pendingGetResult.isEmpty()) {
                     keyValuesInSnapshot.addAll(
-                        filterCellsForSnapshot(pendingGetResult.listCells(), transaction, numberOfVersionsToFetch, familyDeletionCache, attributeMap));
+                        filterCellsForSnapshot(pendingGetResult.listCells(), transaction, numberOfVersionsToFetch, familyDeletionCache, attributeMap)); // 过滤快照结果
                 }
             }
         }
